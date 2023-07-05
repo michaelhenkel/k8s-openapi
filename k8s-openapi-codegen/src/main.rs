@@ -224,7 +224,7 @@ async fn run(
 		}
 
 		log::info!("Applying fixups...");
-		supported_version.fixup(&mut spec)?;
+		let _ = supported_version.fixup(&mut spec);
 
 		let expected_num_generated_types: usize = spec.definitions.len();
 		let expected_num_generated_apis: usize = spec.operations.len();
@@ -329,6 +329,7 @@ impl k8s_openapi_codegen_common::MapNamespace for MapNamespace {
 	fn map_namespace<'a>(&self, path_parts: &[&'a str]) -> Option<Vec<&'a str>> {
 		match path_parts {
 			["io", "k8s", rest @ ..] => Some(std::iter::once("crate").chain(rest.iter().copied()).collect()),
+			["net", "juniper", rest @ ..] => Some(std::iter::once("crate").chain(rest.iter().copied()).collect()),
 			_ => None,
 		}
 	}

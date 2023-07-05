@@ -192,6 +192,7 @@ pub fn run(
 	};
 
 	let path_parts: Vec<_> = definition_path.split('.').collect();
+	println!("path_parts: {:?}", path_parts);
 	let namespace_parts: Vec<_> =
 		map_namespace.map_namespace(&path_parts).ok_or_else(|| format!("unexpected path {definition_path:?}"))?
 		.into_iter()
@@ -499,13 +500,31 @@ pub fn run(
 					},
 				}),
 
-				(Some(_), Some((_, templates::PropertyRequired::Optional | templates::PropertyRequired::OptionalDefault))) =>
-					return Err(format!("definition {definition_path} has optional metadata").into()),
 
 				(
 					Some((api_version, group, kind, version, list_kind)),
 					None,
 				) => Some(templates::ResourceMetadata {
+					api_version,
+					group,
+					kind,
+					version,
+					list_kind: list_kind.as_deref(),
+					metadata_ty: None,
+					url_path_segment_and_scope: match (&*namespace_or_cluster_scoped_url_path_segment_and_scope, &*subresource_url_path_segment_and_scope) {
+						([(url_path_segment, scope)], _) |
+						([], [(url_path_segment, scope)]) => (&**url_path_segment, &**scope),
+
+						([], []) => return Err(format!(
+							"definition {definition_path} is a Resource but its URL path segment and scope could not be inferred").into()),
+						([_, _, ..], _) => return Err(format!(
+							"definition {definition_path} is a Resource but was inferred to have multiple scopes {namespace_or_cluster_scoped_url_path_segment_and_scope:?}").into()),
+						([], [_, _, ..]) => return Err(format!(
+							"definition {definition_path} is a Resource but was inferred to have multiple scopes {subresource_url_path_segment_and_scope:?}").into()),
+					},
+				}),
+				(Some((api_version, group, kind, version, list_kind)),
+				Some((_, templates::PropertyRequired::Optional | templates::PropertyRequired::OptionalDefault))) => Some(templates::ResourceMetadata {
 					api_version,
 					group,
 					kind,
@@ -1116,7 +1135,7 @@ fn get_derives(
 			if !ref_path.references_scope(map_namespace) && ref_path.path == "io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta" => Ok(true),
 
 		// Handled by evaluate_trait_bound
-		swagger20::SchemaKind::Ref(ref_path @ swagger20::RefPath { .. }) if !ref_path.references_scope(map_namespace) => unreachable!(),
+		swagger20::SchemaKind::Ref(ref_path @ swagger20::RefPath { .. }) if !ref_path.references_scope(map_namespace) => Ok(false),
 
 		// chrono::DateTime<chrono::Utc> is not Default
 		swagger20::SchemaKind::Ty(swagger20::Type::String { format: Some(swagger20::StringFormat::DateTime) }) => Ok(false),
@@ -1205,7 +1224,7 @@ fn is_default(
 			if !ref_path.references_scope(map_namespace) && ref_path.path == "io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta" => Ok(true),
 
 		// Handled by evaluate_trait_bound
-		swagger20::SchemaKind::Ref(ref_path @ swagger20::RefPath { .. }) if !ref_path.references_scope(map_namespace) => unreachable!(),
+		swagger20::SchemaKind::Ref(ref_path @ swagger20::RefPath { .. }) if !ref_path.references_scope(map_namespace) => Ok(false),
 
 		// chrono::DateTime<chrono::Utc> is not Default
 		swagger20::SchemaKind::Ty(swagger20::Type::String { format: Some(swagger20::StringFormat::DateTime) }) => Ok(false),
